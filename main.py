@@ -3,12 +3,23 @@ from win10toast import ToastNotifier
 import jdatetime
 import datetime
 import threading
-
+import json
+import os
 
 
 
 reminders = []
+data_file = "reminders.json"
 
+def save_reminders():
+    with open(data_file, 'w') as f:
+        json.dump(reminders, f)
+
+def load_reminders():
+    if os.path.exists(data_file):
+        with open(data_file, 'r') as f:
+            return json.load(f)
+    return []
 
 def show_notification(message, date, reminder_id):
     now = datetime.datetime.now()
@@ -20,11 +31,12 @@ def show_notification(message, date, reminder_id):
     toaster = ToastNotifier()
     toaster.show_toast("Reminder", message, duration=7)
 
-
+    
     for reminder in reminders:
         if reminder["id"] == reminder_id:
             reminder["notified"] = True
             break
+    save_reminders()
 
 def main(page: ft.Page):
     page.title = "Reminder"
@@ -94,18 +106,26 @@ def main(page: ft.Page):
                 reminder_thread = threading.Thread(target=show_notification, args=(message, date_parts, reminder_id))
                 reminder_thread.start()
 
-                show_snackbar("Data Saved!", ft.colors.GREEN)
+                show_snackbar("Data Saved !", ft.colors.GREEN)
 
+                
                 update_reminder_list()
+                save_reminders()
 
+                
                 date_input.value = ""
                 message_input.value = ""
                 page.update()
             else:
                 raise ValueError
         except ValueError:
-            show_snackbar("Please use this format: YYYY-MM-DD", ft.colors.RED)
+            show_snackbar("Wrong Format.Please use : YYYY-MM-DD", ft.colors.RED)
 
+    
+    global reminders
+    reminders = load_reminders()
+    
+    
     date_input = ft.TextField(label="(YYYY-MM-DD)", hint_text="1403-12-05")
     message_input = ft.TextField(label="Your Message")
     btn_submit = ft.ElevatedButton(text="Save", on_click=lambda _: set_reminder(date_input.value, message_input.value))
@@ -114,6 +134,10 @@ def main(page: ft.Page):
     page.add(date_input, message_input, btn_submit, reminder_list)
     page.update()
 
+    
     update_countdown()
+
+    
+    update_reminder_list()
 
 ft.app(target=main)
