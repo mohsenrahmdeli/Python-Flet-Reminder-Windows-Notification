@@ -6,25 +6,22 @@ import threading
 import json
 import os
 
-
-
-
 reminders = []
 data_file = "reminders.json"
 
-
+# Function to save data in JSON file
 def save_reminders():
     with open(data_file, 'w') as f:
         json.dump(reminders, f)
 
-
+# Function to load data from JSON file
 def load_reminders():
     if os.path.exists(data_file):
         with open(data_file, 'r') as f:
             return json.load(f)
     return []
 
-
+# Function to display notification
 def show_notification(message, date, reminder_id):
     now = datetime.datetime.now()
     reminder_date = jdatetime.datetime(*date).togregorian()
@@ -35,7 +32,7 @@ def show_notification(message, date, reminder_id):
     toaster = ToastNotifier()
     toaster.show_toast("Reminder", message, duration=7)
 
-
+    # Update reminder status
     for reminder in reminders:
         if reminder["id"] == reminder_id:
             reminder["notified"] = True
@@ -44,7 +41,7 @@ def show_notification(message, date, reminder_id):
 
 def main(page: ft.Page):
     page.title = "Reminder"
-    page.window_height = 400
+    page.window_height = 700
     page.window_width = 550
     page.window_resizable = False
     page.window_maximizable = False
@@ -52,21 +49,23 @@ def main(page: ft.Page):
     def update_countdown():
         now = datetime.datetime.now()
         for control in reminder_list.controls:
-            if isinstance(control, ft.Row) and len(control.controls) == 4:
-                reminder_date_str = control.controls[0].value.split(" - ")[0]
-                reminder_date_parts = list(map(int, reminder_date_str.split('-')))
-                reminder_date = jdatetime.datetime(*reminder_date_parts).togregorian()
+            if isinstance(control, ft.Column):
+                reminder_row = control.controls[0]
+                if len(reminder_row.controls) == 4:
+                    reminder_date_str = reminder_row.controls[0].value.split(" - ")[0]
+                    reminder_date_parts = list(map(int, reminder_date_str.split('-')))
+                    reminder_date = jdatetime.datetime(*reminder_date_parts).togregorian()
 
-                if now < reminder_date:
-                    time_left = reminder_date - now
-                    days, seconds = time_left.days, time_left.seconds
-                    hours = seconds // 3600
-                    minutes = (seconds % 3600) // 60
-                    seconds = seconds % 60
-                    countdown_text = f"{days}d {hours}h {minutes}m {seconds}s"
-                    control.controls[1].value = countdown_text
-                else:
-                    control.controls[1].value = "Past"
+                    if now < reminder_date:
+                        time_left = reminder_date - now
+                        days, seconds = time_left.days, time_left.seconds
+                        hours = seconds // 3600
+                        minutes = (seconds % 3600) // 60
+                        seconds = seconds % 60
+                        countdown_text = f"{days}d {hours}h {minutes}m {seconds}s"
+                        reminder_row.controls[1].value = countdown_text
+                    else:
+                        reminder_row.controls[1].value = "Past"
         
         page.update()
         threading.Timer(1, update_countdown).start()
@@ -75,27 +74,30 @@ def main(page: ft.Page):
         reminder_list.controls.clear()
         now = datetime.datetime.now()
 
-        for reminder in reminders:
+        # Sort reminders by date
+        sorted_reminders = sorted(reminders, key=lambda x: jdatetime.datetime(*x["date"]).togregorian())
+
+        for reminder in sorted_reminders:
             reminder_date = jdatetime.datetime(*reminder["date"]).togregorian()
             reminder_text = f"{reminder['date'][0]}-{reminder['date'][1]:02d}-{reminder['date'][2]:02d} - {reminder['message']}"
 
             if now > reminder_date:
-                reminder_text = f"{reminder_text} (Past)"
+                reminder_text = f"{reminder_text}"
                 reminder_row = ft.Row([
-                    ft.Text(reminder_text, color="gray", style="text-decoration: line-through;"),
-                    ft.Text("Past", color="gray"),
-                    ft.ElevatedButton(text="Edit", on_click=lambda e, id=reminder["id"]: edit_reminder(id)),
-                    ft.ElevatedButton(text="Delete", on_click=lambda e, id=reminder["id"]: delete_reminder(id)),
+                    ft.Text(reminder_text, color="red", style="text-decoration: line-through;", weight=ft.FontWeight.BOLD),
+                    ft.Text("Past", color="red", weight=ft.FontWeight.BOLD),
+                    ft.IconButton(icon=ft.icons.EDIT, on_click=lambda e, id=reminder["id"]: edit_reminder(id)),
+                    ft.IconButton(icon=ft.icons.DELETE, on_click=lambda e, id=reminder["id"]: delete_reminder(id)),
                 ])
             else:
                 reminder_row = ft.Row([
                     ft.Text(reminder_text),
-                    ft.Text("", color="blue"),
+                    ft.Text("", color="blue", weight=ft.FontWeight.BOLD),
                     ft.IconButton(icon=ft.icons.EDIT, on_click=lambda e, id=reminder["id"]: edit_reminder(id)),
                     ft.IconButton(icon=ft.icons.DELETE, on_click=lambda e, id=reminder["id"]: delete_reminder(id)),
                 ])
 
-            reminder_list.controls.append(reminder_row)
+            reminder_list.controls.append(ft.Column([reminder_row, ft.Divider()]))  # اضافه کردن خط جداکننده
 
         page.update()
 
@@ -116,11 +118,11 @@ def main(page: ft.Page):
 
                 show_snackbar("Data Saved!", ft.colors.GREEN)
 
-
+                # Update the list of reminders
                 update_reminder_list()
                 save_reminders()
 
-
+                # Clear fields
                 date_input.value = ""
                 message_input.value = ""
                 page.update()
@@ -145,11 +147,11 @@ def main(page: ft.Page):
         save_reminders()
         update_reminder_list()
 
-
+    # Load saved reminders
     global reminders
     reminders = load_reminders()
     
-
+    # UI elements
     date_input = ft.TextField(label="Date (YYYY-MM-DD)", hint_text="1403-12-05")
     message_input = ft.TextField(label="Your Message")
     btn_submit = ft.ElevatedButton(text="Save", on_click=lambda _: set_reminder(date_input.value, message_input.value))
@@ -158,10 +160,8 @@ def main(page: ft.Page):
     page.add(date_input, message_input, btn_submit, reminder_list)
     page.update()
 
-
+    # Start the countdown timer
     update_countdown()
 
-
+    # Update reminders list with loaded data
     update_reminder_list()
-
-ft.app(target=main)
